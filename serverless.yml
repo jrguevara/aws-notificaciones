@@ -1,0 +1,40 @@
+service: aws-notificaciones
+configValidationMode: error
+frameworkVersion: "2 || 3"
+
+plugins:
+  - serverless-bundle
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  memorySize: 256
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  iam:
+    role:
+      statements:
+        - ${file(./iam/enviarMailIAM.yml):EnviarMailIAM}
+
+resources:
+  Resources:
+    MailQueue: ${file(./resources/mailQueue.yml):MailQueue}
+  Outputs:
+    MailQueueArn: ${file(./resources/mailQueue.yml):Outputs.MailQueueArn}
+    MailQueueUrl: ${file(./resources/mailQueue.yml):Outputs.MailQueueUrl}
+
+functions:
+  enviarMail:
+    handler: src/handlers/enviarMail.handler
+    events:
+      - sqs:
+          arn: ${self:custom.mailQueue.arn}
+          batchSize: 1
+
+custom:
+  mailQueue: 
+    name: MailQueue-${self:provider.stage}
+    arn: !GetAtt MailQueue.Arn
+    url: !Ref MailQueue
+  bundle:
+    linting: false
